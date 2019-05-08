@@ -5,46 +5,71 @@
             <span class="header__title">ue Carousel</span>
         </div>
         <Carousel>
-            <div class="carousel__item">
-                1
+            <div
+                v-for="item in items"
+                class="carousel__item"
+            >
+                {{item}}
             </div>
-            <div class="carousel__item">
-                2
-            </div>
-            <div class="carousel__item" style="min-width: 400px">
-                3
-            </div>
-            <div class="carousel__item">
-                4
-            </div>
-            <div class="carousel__item" style="min-width: 100px">
-                5
-            </div>
-            <div class="carousel__item">
-                6
-            </div>
-            <div class="carousel__item">
-                7
-            </div>
-            <div class="carousel__item">
-                8
-            </div>
-            <div class="carousel__item">
-                9
-            </div>
+            <!--<div class="carousel__item">-->
+                <!--2-->
+            <!--</div>-->
+            <!--<div class="carousel__item" style="min-width: 400px">-->
+                <!--3-->
+            <!--</div>-->
+            <!--<div class="carousel__item">-->
+                <!--4-->
+            <!--</div>-->
+            <!--<div class="carousel__item" style="min-width: 1000px">-->
+                <!--5-->
+            <!--</div>-->
+            <!--<div class="carousel__item" >-->
+                <!--6-->
+            <!--</div>-->
+            <!--<div class="carousel__item">-->
+                <!--7-->
+            <!--</div>-->
+            <!--<div class="carousel__item">-->
+                <!--8-->
+            <!--</div>-->
+            <!--<div class="carousel__item">-->
+                <!--9-->
+            <!--</div>-->
         </Carousel>
     </div>
 </template>
 
 <script>
-    import Carousel from './components/Carousel.vue'
+import Carousel from './components/Carousel.vue'
 
-    export default {
-        name: 'app',
-        components: {
-            Carousel
+export default {
+    name: 'app',
+    components: {
+        Carousel
+    },
+
+    data() {
+        return {
+            items: []
+        }
+    },
+
+    mounted() {
+        this.getData();
+    },
+
+    methods: {
+        getData() {
+            setTimeout(() => {
+                this.items = [...Array(9).keys()].map(item => item + 1);
+            }, 500)
+
+            setTimeout(() => {
+                this.items.push(11)
+            }, 3000)
         }
     }
+}
 </script>
 
 <style lang="scss">

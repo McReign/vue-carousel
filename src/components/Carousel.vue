@@ -16,8 +16,18 @@
                 <slot></slot>
             </div>
         </div>
-        <button @click="slideLeft">Left</button>
-        <button @click="slideRight">Right</button>
+        <button
+            v-if="showLeftButton"
+            @click="slideLeft"
+        >
+            Left
+        </button>
+        <button
+            v-if="showRightButton"
+            @click="slideRight"
+        >
+            Right
+        </button>
     </div>
 </template>
 
@@ -39,8 +49,15 @@
                 wrapperWidth: 0,
                 carouselWidth: 0,
                 startPosition: 0,
-                direction: 0
+                direction: 0,
+                showRightButton: true,
+                showLeftButton: true,
+                mutationObserver: null
             }
+        },
+
+        created() {
+            this.handleMutation = this.debounce(this.checkWidth, 0);
         },
 
         mounted() {
@@ -48,20 +65,45 @@
             this.initMousemove();
             this.initMouseup();
             this.checkWidth();
+            this.initObserver();
+        },
+
+        beforeDestroy() {
+            this.mutationObserver.disconnect();
+        },
+
+        computed: {
+            getMaxOffset() {
+                return (this.wrapperWidth > this.carouselWidth ?
+                    this.wrapperWidth - this.carouselWidth
+                    : 0);
+            }
         },
 
         methods: {
-            isBeforeStart(offset = 0) {
-                return this.translate + offset > 0;
+            isBeforeStart(translate, offset = 0) {
+                return translate + offset > 0;
             },
 
-            isAfterEnd(offset = 0) {
+            isAfterEnd(translate, offset = 0) {
                 if (this.wrapperWidth >= this.carouselWidth) {
-                    return Math.abs(this.translate + offset) >= Math.abs(this.wrapperWidth - this.carouselWidth);
+                    return Math.abs(translate + offset) >= Math.abs(this.wrapperWidth - this.carouselWidth);
                 }
                 else {
                     return true;
                 }
+            },
+
+            initObserver() {
+                this.mutationObserver = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        this.handleMutation();
+                    });
+                });
+
+                let config = { childList: true };
+
+                this.mutationObserver.observe(this.$refs.wrapper, config);
             },
 
             initMousedown() {
@@ -84,7 +126,7 @@
                         return;
                     }
 
-                    if (this.isBeforeStart(moveX) || this.isAfterEnd(moveX)) {
+                    if (this.isBeforeStart(this.translate, moveX) || this.isAfterEnd(this.translate, moveX)) {
                         this.translate += moveX / 10;
                     }
                     else {
@@ -99,50 +141,86 @@
             initMouseup() {
                 document.addEventListener('mouseup', (e) => {
                     if (!this.hasElement) return;
+
                     this.hasElement = false;
                     this.transitionDuration = 0.5;
-                    this.startPosition = this.getPositionByOffset();
 
-                    if (this.isBeforeStart()) {
-                        this.translate = 0;
-                        return;
+                    if (!this.direction) return;
+
+                    let currentPosition = this.getPositionByOffset(this.translate);
+                    let currentTranslate = this.getOffsetByPosition(currentPosition);
+
+                    if (this.direction > 0) {
+                        currentPosition++;
                     }
 
-                    this.translate = -this.getOffsetByPosition(this.direction > 0 ? this.startPosition + 1 : this.startPosition);
+                    currentTranslate = -this.getOffsetByPosition(currentPosition);
+
+
+                    if (this.isBeforeStart(currentTranslate)) currentTranslate = 0;
+
+                    if (this.isAfterEnd(currentTranslate)) {
+                        currentTranslate = -this.getMaxOffset;
+                    }
+
+                    currentPosition = this.getPositionByOffset(currentTranslate);
+
                     this.direction = 0;
-
-                    if (this.isAfterEnd()) {
-                        this.translate = -(this.wrapperWidth > this.carouselWidth ?
-                            this.wrapperWidth - this.carouselWidth
-                            : 0
-                        );
-                    }
-
-                    this.startPosition = this.getPositionByOffset();
+                    this.startPosition = currentPosition;
+                    this.translate = currentTranslate;
                 })
             },
 
             checkWidth() {
+                this.wrapperWidth = 0;
+                this.elementsWidth = [];
                 this.carouselWidth = this.$refs.carousel.offsetWidth;
 
                 [...this.$refs.wrapper.childNodes].forEach(item => {
                     this.wrapperWidth += this.getElementWidth(item);
                     this.elementsWidth.push(this.getElementWidth(item));
-                })
+                });
             },
 
-            getPositionByOffset() {
+            getInMiddleOfItem(position) {
+                let result = false;
+                for (let index = 0; index < this.elementsWidth.length; index++) {
+                    let currentOffset = this.getOffsetByPosition(index);
+                    let nextOffset = this.getOffsetByPosition(index + 1);
+
+                    if (
+                        this.getOffsetByPosition(position) > currentOffset &&
+                        this.getOffsetByPosition(position) < nextOffset
+                    ) {
+                        result = true;
+                        break;
+                    }
+                }
+
+                return result;
+            },
+
+            getPositionByOffset(offset) {
                 let position = 0;
+
+                if (this.isBeforeStart(offset)) {
+                    offset = 0;
+                }
+
+                if (this.isAfterEnd(offset)) {
+                    offset = -this.getMaxOffset;
+                }
 
                 for (let index = 0; index < this.elementsWidth.length; index++) {
                     let currentOffset = this.getOffsetByPosition(index);
                     let nextOffset = this.getOffsetByPosition(index + 1);
 
                     if (
-                        Math.abs(this.translate) >= currentOffset &&
-                        Math.abs(this.translate) < nextOffset
+                        Math.abs(offset) >= currentOffset &&
+                        Math.abs(offset) < nextOffset
                     ) {
                         position = index;
+                        break;
                     }
                 }
 
@@ -165,21 +243,63 @@
             },
 
             slideRight() {
-                if (this.isAfterEnd()) return;
+                if (Math.abs(this.translate) === this.getMaxOffset) return;
 
-                this.startPosition++;
-                this.translate = -this.getOffsetByPosition(this.startPosition);
+                let currentPosition = this.startPosition;
+
+                currentPosition++;
+
+                if (this.isAfterEnd(this.getOffsetByPosition(currentPosition))) {
+                    this.translate = -this.getMaxOffset;
+                }
+                else {
+                    this.translate = -this.getOffsetByPosition(currentPosition);
+                }
+
+                // console.log(this.getInMiddleOfItem(currentPosition), currentPosition)
+                //
+                // if (this.getInMiddleOfItem(currentPosition)) {
+                //     currentPosition = this.getPositionByOffset(this.translate) + 1;
+                // }
+                // else {
+                //     currentPosition = this.getPositionByOffset(this.translate);
+                // }
+
+                this.startPosition = this.getPositionByOffset(this.translate);
             },
 
             slideLeft() {
-                if (this.startPosition === 0) return;
+                if (this.translate === 0) return;
 
-                this.startPosition--;
-                this.translate = -this.getOffsetByPosition(this.startPosition);
+                let currentPosition = this.startPosition;
 
-                if (this.isBeforeStart()) {
+                currentPosition--;
+
+                if (this.isAfterEnd(this.getOffsetByPosition(currentPosition))) {
                     this.translate = 0;
                 }
+                else {
+                    this.translate = -this.getOffsetByPosition(currentPosition);
+                }
+
+                this.startPosition = this.getPositionByOffset(this.translate);
+            },
+
+            debounce(f, ms) {
+                let timer = null;
+
+                return function (...args) {
+                    const onComplete = () => {
+                        f.apply(this, args);
+                        timer = null;
+                    };
+
+                    if (timer) {
+                        clearTimeout(timer);
+                    }
+
+                    timer = setTimeout(onComplete, ms);
+                };
             }
         }
     }
