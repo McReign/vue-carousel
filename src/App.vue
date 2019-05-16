@@ -5,12 +5,13 @@
             <span class="header__title">ue Carousel</span>
         </div>
         <Carousel>
-            <div
+            <a
+                href="#"
                 v-for="item in items"
                 class="carousel__item"
             >
                 {{item}}
-            </div>
+            </a>
             <!--<div class="carousel__item">-->
                 <!--2-->
             <!--</div>-->
@@ -62,7 +63,7 @@ export default {
         getData() {
             setTimeout(() => {
                 this.items = [...Array(9).keys()].map(item => item + 1);
-            }, 500)
+            }, 0)
 
             setTimeout(() => {
                 this.items.push(11)

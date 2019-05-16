@@ -41,7 +41,7 @@
 
         data() {
             return {
-                hasElement: false,
+                element: null,
                 coordX: 0,
                 translate: 0,
                 transitionDuration: 0.2,
@@ -57,14 +57,14 @@
         },
 
         created() {
-            this.handleMutation = this.debounce(this.checkWidth, 0);
+            this.handleMutation = this.debounce(this.updateWidth, 0);
         },
 
         mounted() {
             this.initMousedown();
             this.initMousemove();
             this.initMouseup();
-            this.checkWidth();
+            this.updateWidth();
             this.initObserver();
         },
 
@@ -109,14 +109,15 @@
             initMousedown() {
                 document.addEventListener('mousedown', (e) => {
                     if (!(this.$refs.wrapper && this.$refs.wrapper.contains(e.target))) return;
-                    this.hasElement = true;
+                    this.element = e.target;
                     this.coordX = e.pageX;
+                    this.element.removeEventListener('click', this.preventClick);
                 })
             },
 
             initMousemove() {
                 document.addEventListener('mousemove', (e) => {
-                    if (!this.hasElement) return;
+                    if (!this.element) return;
 
                     this.transitionDuration = 0;
 
@@ -138,14 +139,23 @@
                 })
             },
 
+            preventClick(e) {
+                e.preventDefault();
+            },
+
             initMouseup() {
                 document.addEventListener('mouseup', (e) => {
-                    if (!this.hasElement) return;
+                    if (!this.element) return;
 
-                    this.hasElement = false;
-                    this.transitionDuration = 0.5;
+                    if (!this.direction) {
+                        this.element = null;
+                        this.transitionDuration = 0.5;
+                        return;
+                    }
 
-                    if (!this.direction) return;
+                    if (this.element === e.target) {
+                        this.element.addEventListener('click', this.preventClick);
+                    }
 
                     let currentPosition = this.getPositionByOffset(this.translate);
                     let currentTranslate = this.getOffsetByPosition(currentPosition);
@@ -168,10 +178,12 @@
                     this.direction = 0;
                     this.startPosition = currentPosition;
                     this.translate = currentTranslate;
+                    this.element = null;
+                    this.transitionDuration = 0.5;
                 })
             },
 
-            checkWidth() {
+            updateWidth() {
                 this.wrapperWidth = 0;
                 this.elementsWidth = [];
                 this.carouselWidth = this.$refs.carousel.offsetWidth;
@@ -320,6 +332,10 @@
             position: relative;
             height: 100%;
             user-select: none;
+
+            a, img {
+                -webkit-user-drag: none;
+            }
         }
     }
 </style>
